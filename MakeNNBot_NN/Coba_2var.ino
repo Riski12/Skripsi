@@ -3,7 +3,6 @@
 #include <math.h>
 #define DEBUG
 #include <Wire.h>
-#define DEBUG
 #include <EEPROM.h>
 
 //Motor Kanan
@@ -14,8 +13,6 @@ const int inputPin3  = 16;    // Pin  7 of L293D IC
 const int inputPin4  = 17;    // Pin  2 of L293D IC
 int EN1 = 10;                 // Pin 1 of L293D IC
 int EN2 = 11;                 // Pin 9 of L293D IC
-const int Button = 22;
-const int LED = 24;
 #define trigPin1 2    // Trigger
 #define echoPin1 3    // Echo
 #define trigPin2  4    // Trigger
@@ -29,19 +26,19 @@ float duration, cm1, cm2, cm3, cm4;
    Network Configuration - customized per network
  ******************************************************************/
 
-const int DataLatih = 99;
+const int DataLatih = 98;
 const int InputNodes = 4;
-const int HiddenNodes = 6;
+const int HiddenNodes = 5;
 const int OutputNodes = 4;
 const float LearningRate = 0.25; // harus coba-coba karena tdk ada teori yg menjelaskan lihat reff web, makanya dibantu dgn momentum
 const float Momentum = 0.9;
 const float InitialWeightMax = 0.5;
-const float Success = 0.0065;
+const float Success = 0.025;
 
 float Input[DataLatih][InputNodes] = {
   {0.033942559, 0.072681704, 0.61038961, 1}, // R
   {0.020887728, 0.072681704, 1, 1},  // R
-  {0.026109661, 0.070175439, 0.225974026, 1},  // R
+  {0.026109661, 0.070175439, 0.225974026, 0.738903394},  // R
   {0.033942559, 0.060150376, 0.350649351, 0.608355091},  // R
   {0, 0.042606516, 0.155844156, 0.399477807},  // R
   {0.010443864, 0.047619048, 0.215584416, 0.164490862},  // R
@@ -52,13 +49,6 @@ float Input[DataLatih][InputNodes] = {
   {0.023498695, 0.047619048, 0.298701299, 0.031331593},  // R
   {0.005221932, 0.040100251, 0.194805195, 0.036553525},  // R
   {0.007832898, 0.07518797, 0.174025974, 0.010443864},  // R
-  //
-  //  {1, 0.072681704, 1, 1},  // R
-  //  {0.608355091, 0.060150376, 1, 1},  // R
-  //  {0.268929504, 0.047619048, 0.350649351, 0.608355091},  // R
-  //  {0.438642298, 0.040100251, 0.480519481, 0.765013055},  // R
-  //  {0.765013055, 0.065162907, 0.61038961, 0.347258486},  // R
-  //  {0.154046997, 0.055137845, 0.194805195, 0.18537859},  // R
 
   {1, 0.072681704, 1, 0.007832898},  // R
   {0.738903394, 0.060150376, 0.623376623, 0.033942559},  // R
@@ -104,9 +94,9 @@ float Input[DataLatih][InputNodes] = {
   {0.765013055, 0.065162907, 0.61038961, 0.347258486},  //B
   {0.154046997, 0.055137845, 0.194805195, 0.18537859},  //B
 
-  {1, 6.015037594, 0.87012987, 0.791122715}, // F
+  {1, 1, 0.87012987, 0.791122715}, // F
   {1, 0.874686717, 1, 0.608355091}, // F
-  {1, 5.511278195, 1, 1}, // F
+  {1, 1, 1, 1}, // F
   {0.869451697, 0.799498747, 0.506493506, 0.477806789}, // F
   {0.608355091, 0.498746867, 0.415584416, 0.425587467}, // F
   {0.219321149, 0.243107769, 0.192207792, 0.216710183}, // F
@@ -304,9 +294,8 @@ float OutputDelta[OutputNodes];
 float ChangeHiddenWeights[InputNodes + 1][HiddenNodes];
 float ChangeOutputWeights[HiddenNodes + 1][OutputNodes];
 int EEAddress ;   //Location we want the data to be put.
-unsigned long waktu;
 int ButtonState = 0;
-
+unsigned long waktu = 0;
 
 void setup() {
   Serial.begin(9600);
@@ -326,9 +315,7 @@ void setup() {
   pinMode(inputPin2, OUTPUT);
   pinMode(inputPin3, OUTPUT);
   pinMode(inputPin4, OUTPUT);
-
-  pinMode(Button, INPUT);
-  pinMode(LED, OUTPUT);
+ 
   randomSeed(analogRead(A6));       //Collect a random ADC sample for NilaiAcakmization.
   Tampil = 1;
   for ( p = 0 ; p < DataLatih ; p++ ) {
@@ -342,21 +329,7 @@ void setup() {
 
 
 void loop() {
-
-  ButtonState = digitalRead(Button);
-  if (ButtonState == HIGH) {
-    Serial.print("1");
-    EEAddress = 0;
-    Serial.println("--Mulai Training-");
-    //train nn dan menyimpan weight pada eeprom
-    train_nn();
-    Serial.println("-Training Selesai-");
-    EEPROM.put(EEAddress, HiddenWeights);
-    EEAddress += sizeof(HiddenWeights);
-    EEPROM.put(EEAddress, OutputWeights);
-    Serial.println("Data Telah Disimpan di EEPROM");
-    drive_nn();
-  } else {
+  //Untuk pergerakan saja
     EEAddress = 0;
     Serial.println("Load Data from EEPROM");
     EEPROM.get(EEAddress, HiddenWeights);
@@ -369,67 +342,67 @@ void loop() {
     EEPROM.get(EEAddress, OutputWeights);
     for (int i = 0; i < OutputNodes; i++) {
       for (int j = 0; j < HiddenNodes; j++) {
-        Serial.println( OutputWeights[j][i], 9 );
+        Serial.println( HiddenWeights[j][i], 9 );
       }
     };
+//        Serial.println(OutputWeights);
     drive_nn();
-  }
-  //Untuk pergerakan saja
-  //  EEAddress = 0;
-  //  Serial.println("Load Data from EEPROM");
-  //  EEPROM.get(EEAddress, HiddenWeights);
-  //  for (int i = 0; i < HiddenNodes; i++) {
-  //    for (int j = 0; j < InputNodes; j++) {
-  //      Serial.println( HiddenWeights[j][i], 9 );
-  //    }
-  //  };
-  //  EEAddress += sizeof(HiddenWeights);
-  //  EEPROM.get(EEAddress, OutputWeights);
-  //  for (int i = 0; i < OutputNodes; i++) {
-  //    for (int j = 0; j < HiddenNodes; j++) {
-  //      Serial.println( HiddenWeights[j][i], 9 );
-  //    }
-  //  };
-  //      Serial.println(OutputWeights);
-  //  drive_nn();
 
-  //    if (Serial.available() > 0)
-  //    {
-  //      mode = Serial.read();
-  //      Serial.println(mode);
-  //      if (mode == '1') {
-  //        EEAddress = 0;
-  //        Serial.println("--Mulai Training-");
-  //        //train nn dan menyimpan weight pada eeprom
-  //        train_nn();
-  //        Serial.println("-Training Selesai-");
-  //        EEPROM.put(EEAddress, HiddenWeights);
-  //        EEAddress += sizeof(HiddenWeights);
-  //        EEPROM.put(EEAddress, OutputWeights);
-  //        Serial.println("Data Telah Disimpan di EEPROM");
-  //        drive_nn();
-  //      }
-  //
-  //      else if (mode == '2') {
-  //        EEAddress = 0;
-  //        Serial.println("Load Data from EEPROM");
-  //        EEPROM.get(EEAddress, HiddenWeights);
-  //        for (int i = 0; i < HiddenNodes; i++) {
-  //          for (int j = 0; j < InputNodes; j++) {
-  //            Serial.println( HiddenWeights[j][i], 9 );
-  //          }
-  //        };
-  //        EEAddress += sizeof(HiddenWeights);
-  //        EEPROM.get(EEAddress, OutputWeights);
-  //        for (int i = 0; i < OutputNodes; i++) {
-  //          for (int j = 0; j < HiddenNodes; j++) {
-  //            Serial.println( HiddenWeights[j][i], 9 );
-  //          }
-  //        };
-  //        //      Serial.println(OutputWeights);
-  //        drive_nn();
-  //      }
-  //    }
+  // Untuk training saja
+//  EEAddress = 0;
+//  Serial.println("--Mulai Training-");
+//  //train nn dan menyimpan weight pada eeprom
+//  train_nn();
+//  waktu = millis();
+//  Serial.print("Waktu : ");
+//  Serial.println(waktu);
+//  Serial.println("-Training Selesai-");
+//  EEPROM.put(EEAddress, HiddenWeights);
+//  EEAddress += sizeof(HiddenWeights);
+//  EEPROM.put(EEAddress, OutputWeights);
+//  Serial.println("Data Telah Disimpan di EEPROM");
+//  drive_nn(); 
+
+//  if (Serial.available() > 0)
+//  {
+//    mode = Serial.read();
+//    Serial.println(mode);
+//    if (mode == '1') {
+//      EEAddress = 0;
+//      Serial.println("--Mulai Training-");
+//      //train nn dan menyimpan weight pada eeprom
+//      waktu = millis();
+//      train_nn();
+//      Serial.print("Waktu : ");
+//      Serial.println(waktu);
+//      Serial.println("-Training Selesai-");
+//      EEPROM.put(EEAddress, HiddenWeights);
+//      EEAddress += sizeof(HiddenWeights);
+//      EEPROM.put(EEAddress, OutputWeights);
+//      Serial.println("Data Telah Disimpan di EEPROM");
+//      drive_nn();
+//    }
+//
+//    else if (mode == '2') {
+//      EEAddress = 0;
+//      Serial.println("Load Data from EEPROM");
+//      EEPROM.get(EEAddress, HiddenWeights);
+//      for (int i = 0; i < HiddenNodes; i++) {
+//        for (int j = 0; j < InputNodes; j++) {
+//          Serial.println( HiddenWeights[j][i], 9 );
+//        }
+//      };
+//      EEAddress += sizeof(HiddenWeights);
+//      EEPROM.get(EEAddress, OutputWeights);
+//      for (int i = 0; i < OutputNodes; i++) {
+//        for (int j = 0; j < HiddenNodes; j++) {
+//          Serial.println( HiddenWeights[j][i], 9 );
+//        }
+//      };
+//      //      Serial.println(OutputWeights);
+//      drive_nn();
+//    }
+//  }
 
 
 }
@@ -438,8 +411,8 @@ void loop() {
 //THIS ROUTINE IS FOR TESTING THE MOTORS
 //DRIVES MOTOR
 void Maju() {
-  analogWrite(EN1, 200);      //sets the motors speed
-  analogWrite(EN2, 200);      //sets the motors speed
+  analogWrite(EN1, 100);      //sets the motors speed
+  analogWrite(EN2, 100);      //sets the motors speed
   digitalWrite(inputPin1, HIGH);
   digitalWrite(inputPin2, LOW);
   digitalWrite(inputPin3, HIGH);
@@ -447,8 +420,8 @@ void Maju() {
 }
 
 void Mundur() {
-  analogWrite(EN1, 200);      //sets the motors speed
-  analogWrite(EN2, 200);      //sets the motors speed
+  analogWrite(EN1, 100);      //sets the motors speed
+  analogWrite(EN2, 100);      //sets the motors speed
   digitalWrite(inputPin1, LOW);
   digitalWrite(inputPin2, HIGH);
   digitalWrite(inputPin3, LOW);
@@ -456,8 +429,8 @@ void Mundur() {
 }
 
 void Kanan() {
-  analogWrite(EN1, 150);      //sets the motors speed
-  analogWrite(EN2, 200);      //sets the motors speed
+  analogWrite(EN1, 100);      //sets the motors speed
+  analogWrite(EN2, 100);      //sets the motors speed
   digitalWrite(inputPin1, LOW);
   digitalWrite(inputPin2, HIGH);
   digitalWrite(inputPin3, HIGH);
@@ -465,12 +438,21 @@ void Kanan() {
 }
 
 void Kiri() {
-  analogWrite(EN1, 200);      //sets the motors speed
-  analogWrite(EN2, 150);      //sets the motors speed
+  analogWrite(EN1, 100);      //sets the motors speed
+  analogWrite(EN2, 100);      //sets the motors speed
   digitalWrite(inputPin1, HIGH);
   digitalWrite(inputPin2, LOW);
   digitalWrite(inputPin3, LOW);
   digitalWrite(inputPin4, HIGH);
+}
+
+void Diam(){
+  analogWrite(EN1,0);      //sets the motors speed
+  analogWrite(EN2,0);      //sets the motors speed
+  digitalWrite(inputPin1, LOW);
+  digitalWrite(inputPin2, LOW);
+  digitalWrite(inputPin3, LOW);
+  digitalWrite(inputPin4, LOW); 
 }
 
 
@@ -508,7 +490,7 @@ void train_nn() {
     }
   }
   //Serial.println("Initial/Untrained Outputs: ");
-  //toTerminal();
+//  toTerminal();
   /******************************************************************
     Begin training
   ******************************************************************/
@@ -573,6 +555,10 @@ void train_nn() {
       }
       //Serial.println(Output[0]*100);
 
+
+
+
+
       /******************************************************************
         Backpropagate errors to hidden layer
       ******************************************************************/
@@ -583,7 +569,6 @@ void train_nn() {
         }
         HiddenDelta[i] = Akumulator * Hidden[i] * (1.0 - Hidden[i]) ;
       }
-
       /******************************************************************
         Update Inner-->Hidden Weights
       ******************************************************************/
@@ -595,7 +580,6 @@ void train_nn() {
           HiddenWeights[j][i] += ChangeHiddenWeights[j][i] ;
         }
       }
-
       /******************************************************************
         Update Hidden-->Output Weights
       ******************************************************************/
@@ -608,31 +592,18 @@ void train_nn() {
         }
       }
     }
-
     /******************************************************************
       Every 100 cycles send data to terminal for display and draws the graph on OLED
     ******************************************************************/
     Tampil = Tampil - 1;
     if (Tampil == 0)
     {
-      //      int graphNum = SiklusPelatihan / 100;
-      //      int graphE1 = Error * 1000;
-      //      int graphE = map(graphE1, 3, 80, 47, 0);
-      //      ErrorGraph[graphNum] = graphE;
-      //      u8g2.firstPage();
-      //      do {
-      //        drawGraph();
-      //      } while ( u8g2.nextPage());
-
       Serial.println();
       Serial.println();
       Serial.print ("SiklusPelatihan: ");
       Serial.print (SiklusPelatihan);
       Serial.print ("  Error = ");
       Serial.println (Error, 5);
-      Serial.print("Waktu : ");
-      waktu = millis();
-      Serial.println(waktu);
       //      Serial.print ("  Graph Num: ");
       //      Serial.print (graphNum);
       //      Serial.print ("  Graph Error1 = ");
@@ -640,7 +611,7 @@ void train_nn() {
       //      Serial.print ("  Graph Error = ");
       //      Serial.println (graphE);
 
-      //toTerminal();
+//      toTerminal();
 
       if (SiklusPelatihan == 1)
       {
@@ -673,6 +644,9 @@ void drive_nn()
   //    Serial.println("NN not Trained");
   //  }
   while (true) {
+  waktu = millis();
+  Serial.print("Waktu : ");
+  Serial.println(waktu);
     float TestInput[] = {0, 0, 0, 0};
 
     //  Sensor ultrasonik 1
@@ -734,10 +708,10 @@ void drive_nn()
     if (cm4 > 400) {
       cm4 = 400;
     };
-    //    cm1 = 120;
-    //    cm2 = 22;
-    //    cm3 = 20;
-    //    cm4 = 110;
+//        cm1 = 22;
+//        cm2 = 60;
+//        cm3 = 60;
+//        cm4 = 26;
 
 #ifdef DEBUG
     Serial.print("Distance: ");
@@ -755,14 +729,14 @@ void drive_nn()
     cm3 = peta(cm3, 15, 400, 0, 1);
     cm4 = peta(cm4, 17, 400, 0, 1);
 
-    Serial.println("Map: ");
-    Serial.print("cm1: ");
+    Serial.print("Map: ");
+    Serial.print("  cm1:");
     Serial.print(cm1);
-    Serial.print("cm2: ");
+    Serial.print("  cm2:");
     Serial.print(cm2);
-    Serial.print("cm3: ");
+    Serial.print("  cm3:");
     Serial.print(cm3);
-    Serial.print("cm4: ");
+    Serial.print("  cm4:");
     Serial.println(cm4);
 
 
@@ -771,15 +745,15 @@ void drive_nn()
     cm3 = constrain(cm3, 0, 1);
     cm4 = constrain(cm4, 0, 1);
 
-    Serial.println("Constrain: ");
-    Serial.print("cm1: ");
-    Serial.print(cm1);
-    Serial.print("cm2: ");
-    Serial.print(cm2);
-    Serial.print("cm3: ");
-    Serial.print(cm3);
-    Serial.print("cm4: ");
-    Serial.println(cm4);
+//    Serial.println("Constrain: ");
+//    Serial.print("cm1: ");
+//    Serial.print(cm1);
+//    Serial.print("cm2: ");
+//    Serial.print(cm2);
+//    Serial.print("cm3: ");
+//    Serial.print(cm3);
+//    Serial.print("cm4: ");
+//    Serial.println(cm4);
 
     TestInput[0] = cm1;
     TestInput[1] = cm2;
@@ -814,6 +788,10 @@ void drive_nn()
     else if (Output[3] > 0.5) {
       Kiri();
       Serial.println("Kiri");
+    }
+    else if ((Output[0]<0.5) && (Output[1]<0.5)&&(Output[2]<0.5)&&(Output[3]<0.5)){
+      Diam();
+      Serial.println("Diam");      
     }
   }
 }
